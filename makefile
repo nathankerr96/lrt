@@ -1,12 +1,8 @@
 
 default: lrt
 
-lrt.o: lrt.c
-	gcc -c lrt.c -o lrt.o
-
-lrt: lrt.o
-	gcc lrt.o -o lrt
+lrt: lrt.c
+	gcc -g -O0 lrt.c -o lrt
 
 clean:
-	-rm lrt.o
 	-rm lrt
