@@ -24,7 +24,7 @@ typedef struct rangeTree {
     int size;
     int dimensions;
     Node *root;
-    Point ** points;
+    Point **points;
 }RangeTree;
 
 
@@ -40,6 +40,7 @@ RangeTree *build_range_tree(Point **points, int size, int dimension, int total_d
 int check_subtree_ordering(Node *root, int current_dimension, int min, int max);
 int check_range_tree_ordering(Node *root, int current_dimension, int total_dimensions);
 int check_range_subtrees(Node *root, int current_dimension, int total_dimensions);
+void free_range_tree(RangeTree *rt);
 
 
 int max(int first, int second) {
@@ -234,6 +235,10 @@ Node *build_subtree(Point **points, int low, int high, int dimension, int total_
         }
 
         new_node->rt = build_range_tree(new_points, new_size, dimension+1, total_dimensions);
+        //Only assign points to last dimension
+        if (dimension < (total_dimensions - 1)) {
+            free(new_points);
+        }
     } else {
         new_node->rt = NULL;
     }
@@ -245,10 +250,11 @@ Node *build_subtree(Point **points, int low, int high, int dimension, int total_
 
 //TODO: Rewrite
 //frees the component array of each point then the point array
-void free_points(Point *points, int size) {
+void free_points(Point **points, int size) {
     int i;
     for(i=0; i<size; i++) {
-        free(points[i].components);
+        free(points[i]->components);
+        free(points[i]);
     }
 
     free(points);
@@ -265,7 +271,11 @@ RangeTree *build_range_tree(Point **points, int size, int dimension, int total_d
     rt->size = size;
     rt->dimensions = total_dimensions;
     rt->root = build_subtree(points, 0, size, dimension, total_dimensions);
-    rt->points = points;
+    if (dimension == total_dimensions) {
+        rt->points = points;
+    } else {
+        rt->points = NULL;
+    }
 
     //printf("Final Root:\n");
     //print_point(rt->root->point, dimensions);
@@ -674,19 +684,15 @@ Point **query(RangeTree *rt, Point *first_bound, Point *second_bound, int dimens
         return get_points_in_range(rt, lower_bound, upper_bound, dimension);
     }
 
-    
       
     return NULL;
-
-    //combine points returned by all recursive calls
-    
 }
 
 
-Point **test_random_query(void) {
+void test_random_query(void) {
 
     int size = 1000;
-    int dimensions = 2;
+    int dimensions = 4;
     Point **points = generate_random(size, dimensions);
 
     RangeTree *rt = build_range_tree(points, size, 1, dimensions);
@@ -696,15 +702,69 @@ Point **test_random_query(void) {
     print_point(query_points[0], dimensions);
     print_point(query_points[1], dimensions);
 
-    return query(rt, query_points[0], query_points[1], 1);
+    clock_t t;
+    t = clock();
 
+    Point **points_in_range = query(rt, query_points[0], query_points[1], 1);
+
+    t = clock() - t;
+    double time_taken = ((double) t) / CLOCKS_PER_SEC;
+
+    printf("Time Taken: %f seconds\n", time_taken);
+
+
+    free_range_tree(rt);
+    free_points(query_points, 2);
+    free_points(points, size);
+}
+
+
+void free_node(Node *root) {
+    //free sub_range_tree
+    if (root->rt != NULL) {
+        free_range_tree(root->rt);
+    }
+
+    //free left subtree
+    if (root->left_child != NULL) {
+        free_node(root->left_child);
+    }
+    
+    //free right subtree
+    if (root->right_child != NULL) {
+        free_node(root->right_child);
+    }
+
+    //free self (free points)
+    free(root);    
+
+}
+
+
+void free_range_tree(RangeTree *rt) {
+    Node *root = rt->root;
+
+    free_node(root);
+
+    /*
+    int i;
+    for (i=0; i < rt->size; i++) {
+        free(rt->points[i]);
+    }
+    */
+
+    if (rt->points != NULL) {
+        free(rt->points);
+    }
+    
+    free(rt);
 }
 
 
 void test_query(void) {
 
-    int size = 1000;
-    int dimensions = 2;
+    int size = 100;
+    int dimensions = 3;
     Point **points = generate_known(size, dimensions);
 
     print_points(points, size, dimensions);
@@ -728,6 +788,10 @@ void test_query(void) {
 
     query(rt, query_points[0], query_points[1], 1);
 
+    free_range_tree(rt);
+    free_points(query_points, 2);
+    free_points(points, size);
+
 }
 
 
@@ -743,10 +807,8 @@ int main(void) {
     */
 
     //test_range_tree_construction();
+    
     test_random_query();
 
-
-
-    
     return 0;
 }
